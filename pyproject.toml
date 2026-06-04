@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-scientist-langgraph"
+version = "0.1.0"
+description = "A LangChain + LangGraph multi-agent research workflow."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "langchain>=1.1.0,<2.0.0",
+  "langgraph>=1.0.0,<2.0.0",
+  "langgraph-checkpoint-sqlite>=3.1.0,<4.0.0",
+  "pydantic>=2.7.0,<3.0.0",
+  "pypdf>=5.0.0,<6.0.0",
+  "langchain-openai>=1.0.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0,<9.0.0",
+]
+
+[project.scripts]
+ai-scientist = "app.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

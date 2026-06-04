@@ -1,0 +1,9 @@
+(AI-Scientist) PS D:\python\AI-Scientist> set OPENAI_BASE_URL=https://api.deepseek.com
+(AI-Scientist) PS D:\python\AI-Scientist> set OPENAI_API_KEY=sk-68dad1b427f04229b2fb4d6945280edb
+(AI-Scientist) PS D:\python\AI-Scientist> set OPENAI_MODEL_NAME=deepseek-v4-flash
+(AI-Scientist) PS D:\python\AI-Scientist> python main.py start --topic "MRI图像超分辨率" --domain "人工智能" --paper-dir "C:\Users\GGDog\Desktop\testagent"
+[AI-Scientist] 运行模式: llm(openai:gpt-4.1-mini)
+[AI-Scientist] 已识别论文 PDF 数量: 2
+[AI-Scientist] 论文目录/文件准备完成，开始执行多 Agent 工作流。
+...
+openai.PermissionDeniedError: Error code: 403 - {'error': {'code': 'unsupported_country_region_territory', 'message': 'Country, region, or territory not supported', 'param': None, 'type': 'request_forbidden'}}

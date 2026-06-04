@@ -1,0 +1,8 @@
+(AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_BASE_URL="https://api.deepseek.com"
+(AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_API_KEY="你的新 key"
+(AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_MODEL_NAME="deepseek-v4-flash"
+(AI-Scientist) PS D:\python\AI-Scientist> python main.py start --topic "MRI图像超分辨率" --domain "人工智能" --paper-dir "C:\Users\GGDog\Desktop\testagent"
+[AI-Scientist] 运行模式: llm(openai:deepseek-v4-flash)
+[AI-Scientist] 模型配置来源: OPENAI_MODEL_NAME
+...
+UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-9: ordinal not in range(128)

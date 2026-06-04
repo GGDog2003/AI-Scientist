@@ -1,0 +1,1 @@
+但我执行了python main.py start --topic "MRI图像超分辨率" --domain "人工智能" --paper-dir "C:\Users\GGDog\Desktop\testagent"之后，出来一个workspace文件夹，但是是秒出的，我要的是执行了之后，自动调用大模型，跟claude code那样的
