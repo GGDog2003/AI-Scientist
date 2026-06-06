@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -87,6 +88,70 @@ class ResearchStateMachine:
     def get_state(self, thread_id: str):
         return self.graph.get_state(build_thread_config(thread_id))
 
+    def run_until_pause(self, input_value: Any, thread_id: str) -> tuple[Any, list[Any]]:
+        # 供 GUI 和 CLI 共用的运行入口：持续执行到流程结束或命中中断点。
+        config = build_thread_config(thread_id)
+        interrupts: list[Any] = []
+        for event in self.graph.stream(input_value, config=config):
+            if "__interrupt__" in event:
+                interrupts.extend(event["__interrupt__"])
+        snapshot = self.graph.get_state(config)
+        return snapshot, interrupts
+
+    def _append_progress_event(
+        self,
+        state: WorkflowState,
+        step_key: str,
+        label: str,
+        agent: str,
+        status: str,
+        artifact_path: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        # 为 GUI 追加结构化进度日志，前端只需按同一个 step_key 取最新状态即可。
+        self.artifact_manager.append_log(
+            "progress.jsonl",
+            {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "thread_id": state["thread_id"],
+                "step_key": step_key,
+                "label": label,
+                "agent": agent,
+                "status": status,
+                "artifact_path": artifact_path,
+                "detail": detail,
+                "current_stage": state.get("current_stage"),
+            },
+        )
+
+    def _mark_step_started(self, state: WorkflowState, step_key: str, label: str, agent: str) -> None:
+        # 记录某一步已经开始执行，供前端显示旋转中的进度项。
+        self._append_progress_event(state, step_key, label, agent, "running")
+
+    def _mark_step_completed(
+        self,
+        state: WorkflowState,
+        step_key: str,
+        label: str,
+        agent: str,
+        artifact_path: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        # 记录某一步已经完成，必要时附带可打开的产物路径。
+        self._append_progress_event(state, step_key, label, agent, "completed", artifact_path, detail)
+
+    def _mark_step_waiting(
+        self,
+        state: WorkflowState,
+        step_key: str,
+        label: str,
+        agent: str,
+        detail: str | None = None,
+        artifact_path: str | None = None,
+    ) -> None:
+        # 记录某一步正在等待人工输入，供前端显示“导入实验结果”按钮。
+        self._append_progress_event(state, step_key, label, agent, "waiting", artifact_path, detail)
+
     def _register_artifact(self, state: WorkflowState, artifact: ArtifactRecord) -> dict[str, Any]:
         artifacts = list(state.get("artifacts", []))
         artifacts.append(artifact.model_dump())
@@ -162,13 +227,16 @@ class ResearchStateMachine:
         )
 
     def bootstrap_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "bootstrap", "初始化研究流程", "system")
         self.artifact_manager.append_log(
             "workflow.jsonl",
             {"event": "bootstrap", "thread_id": state["thread_id"], "topic": state["topic"]},
         )
+        self._mark_step_completed(state, "bootstrap", "初始化研究流程", "system")
         return {"current_stage": "literature_research", "active_agent": "student"}
 
     def student_literature_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "literature_summary", "研究生正在阅读并整理文献", "student")
         synthesis = self.student_agent.summarize_literature(
             {"topic": state["topic"], "domain": state["domain"], "paper_paths": state.get("paper_paths", [])}
         )
@@ -211,9 +279,17 @@ class ResearchStateMachine:
             "active_agent": "student",
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "literature_summary",
+            "研究生正在阅读并整理文献",
+            "student",
+            artifact.path,
+        )
         return update
 
     def student_innovation_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "innovation_proposal", "研究生正在提出创新点方案", "student")
         proposal = self.student_agent.propose_innovations(
             {
                 "topic": state["topic"],
@@ -277,9 +353,17 @@ class ResearchStateMachine:
         }
         update.update(self._register_artifact(state, artifact))
         update.update(self._append_message(state, submission))
+        self._mark_step_completed(
+            state,
+            "innovation_proposal",
+            "研究生正在提出创新点方案",
+            "student",
+            artifact.path,
+        )
         return update
 
     def advisor_innovation_review_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "innovation_review", "导师正在审核创新点方案", "advisor")
         review = self.advisor_agent.review_innovations(
             {
                 "topic": state["topic"],
@@ -339,9 +423,18 @@ class ResearchStateMachine:
         }
         update.update(self._register_artifact(state, artifact))
         update.update(self._append_message(state, reply))
+        self._mark_step_completed(
+            state,
+            "innovation_review",
+            "导师正在审核创新点方案",
+            "advisor",
+            artifact.path,
+            review.decision.value,
+        )
         return update
 
     def student_experiment_design_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "experiment_design", "研究生正在设计实验方案", "student")
         approved_innovation = state.get("approved_innovation") or self._pick_innovation(state)
         plan = self.student_agent.design_experiment(
             {
@@ -380,9 +473,24 @@ class ResearchStateMachine:
             "active_agent": "student",
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "experiment_design",
+            "研究生正在设计实验方案",
+            "student",
+            artifact.path,
+        )
         return update
 
     def human_experiment_interrupt_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_waiting(
+            state,
+            "human_experiment",
+            "等待人工导入实验结果",
+            "human",
+            "请导入实验结果 JSON 后继续流程",
+            state.get("experiment_plan_path"),
+        )
         human_payload = interrupt(
             {
                 "stage": "human_experiment",
@@ -411,9 +519,17 @@ class ResearchStateMachine:
             "suspend_reason": None,
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "human_experiment",
+            "等待人工导入实验结果",
+            "human",
+            artifact.path,
+        )
         return update
 
     def student_result_analysis_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "result_analysis", "研究生正在分析实验结果", "student")
         analysis = self.student_agent.analyze_results(
             {
                 "topic": state["topic"],
@@ -447,9 +563,17 @@ class ResearchStateMachine:
             "active_agent": "advisor",
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "result_analysis",
+            "研究生正在分析实验结果",
+            "student",
+            artifact.path,
+        )
         return update
 
     def advisor_result_gate_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "advisor_result_gate", "导师正在根据实验结果决定是否放行", "advisor")
         forced_decision, decision_rationale = self._decide_experiment_gate_from_human_result(state.get("human_result"))
         review = self.advisor_agent.review_experiment_results(
             {
@@ -496,9 +620,18 @@ class ResearchStateMachine:
             "active_agent": "student",
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "advisor_result_gate",
+            "导师正在根据实验结果决定是否放行",
+            "advisor",
+            artifact.path,
+            normalized_review.decision.value,
+        )
         return update
 
     def student_manuscript_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "manuscript_drafting", "研究生正在撰写论文草稿", "student")
         draft = self.student_agent.draft_manuscript(
             {
                 "topic": state["topic"],
@@ -557,9 +690,17 @@ class ResearchStateMachine:
         }
         update.update(self._register_artifact(state, artifact))
         update.update(self._append_message(state, submission))
+        self._mark_step_completed(
+            state,
+            "manuscript_drafting",
+            "研究生正在撰写论文草稿",
+            "student",
+            artifact.path,
+        )
         return update
 
     def advisor_paper_review_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "advisor_paper_review", "导师正在审核论文草稿", "advisor")
         review = self.advisor_agent.review_manuscript(
             {
                 "manuscript_path": state.get("manuscript_path"),
@@ -613,9 +754,18 @@ class ResearchStateMachine:
         }
         update.update(self._register_artifact(state, artifact))
         update.update(self._append_message(state, reply))
+        self._mark_step_completed(
+            state,
+            "advisor_paper_review",
+            "导师正在审核论文草稿",
+            "advisor",
+            artifact.path,
+            review.decision.value,
+        )
         return update
 
     def reviewer_blind_review_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "reviewer_blind_review", "审稿人正在盲审论文", "reviewer")
         review = self.reviewer_agent.blind_review(
             {"manuscript_path": state.get("manuscript_path"), "review_round": state.get("blind_review_round", 0)}
         )
@@ -653,9 +803,18 @@ class ResearchStateMachine:
             else "system",
         }
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(
+            state,
+            "reviewer_blind_review",
+            "审稿人正在盲审论文",
+            "reviewer",
+            artifact.path,
+            review.decision.value,
+        )
         return update
 
     def student_final_revision_react_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "final_polish", "研究生正在润色最终论文", "student")
         draft = self.student_agent.draft_manuscript(
             {
                 "topic": state["topic"],
@@ -691,9 +850,11 @@ class ResearchStateMachine:
         )
         update = {"manuscript_path": artifact.path, "current_stage": "finalize", "active_agent": "system"}
         update.update(self._register_artifact(state, artifact))
+        self._mark_step_completed(state, "final_polish", "研究生正在润色最终论文", "student", artifact.path)
         return update
 
     def finalize_node(self, state: WorkflowState) -> dict[str, Any]:
+        self._mark_step_started(state, "finalize", "系统正在整理最终结果", "system")
         final_summary = "\n".join(
             [
                 f"主题：{state['topic']}",
@@ -707,6 +868,14 @@ class ResearchStateMachine:
         self.artifact_manager.append_log(
             "workflow.jsonl",
             {"event": "completed", "thread_id": state["thread_id"], "final_decision": state.get("review_decision")},
+        )
+        self._mark_step_completed(
+            state,
+            "finalize",
+            "系统正在整理最终结果",
+            "system",
+            state.get("manuscript_path"),
+            state.get("review_decision"),
         )
         return {
             "workflow_status": WorkflowStatus.completed.value,
