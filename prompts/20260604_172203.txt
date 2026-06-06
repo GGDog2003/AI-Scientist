@@ -1,5 +1,5 @@
 (AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_BASE_URL="https://api.deepseek.com"
-(AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_API_KEY="sk-68dad1b427f04229b2fb4d6945280edb"
+(AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_API_KEY="sk-"
 (AI-Scientist) PS D:\python\AI-Scientist> $env:OPENAI_MODEL_NAME="deepseek-v4-flash"
 (AI-Scientist) PS D:\python\AI-Scientist> python main.py start --topic "MRI图像超分辨率" --domain "人工智能" --paper-dir "C:\Users\GGDog\Desktop\testagent"
 ...

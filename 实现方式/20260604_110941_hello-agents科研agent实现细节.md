@@ -627,7 +627,7 @@ INIT
   "waiting_for_agent": "advisor",
   "suspend_reason": "innovation_review",
   "submitted_artifact_type": "innovation_card",
-  "submitted_artifact_path": "workspace1/innovation_meetings/20260604_v2_创新点候选列表.md",
+  "submitted_artifact_path": "workspace/innovation_meetings/20260604_v2_创新点候选列表.md",
   "workflow_status": "suspended"
 }
 ```
@@ -675,7 +675,7 @@ INIT
   "to_agent": "advisor",
   "stage": "innovation_review",
   "artifact_type": "innovation_card",
-  "artifact_path": "workspace1/innovation_meetings/20260604_v1_创新点候选列表.md",
+  "artifact_path": "workspace/innovation_meetings/20260604_v1_创新点候选列表.md",
   "summary": "候选创新点共4个，请评估新颖性与可行性",
   "metadata": {
     "topic": "图像分割",
@@ -709,7 +709,7 @@ INIT
   "to_agent": "student",
   "stage": "innovation_review_reply",
   "decision": "revise",
-  "comments_path": "workspace1/innovation_meetings/20260604_v1_导师反馈.md",
+  "comments_path": "workspace/innovation_meetings/20260604_v1_导师反馈.md",
   "resume_token": "resume_001"
 }
 ```

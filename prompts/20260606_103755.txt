@@ -1,0 +1,1 @@
+[prompts](app/prompts/) 这个文件夹下的init文件里面的提示词，和那三个txt文本的system_prompt有啥关联
